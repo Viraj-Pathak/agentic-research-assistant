@@ -17,6 +17,19 @@ if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
 # ---------------------------------------------------------------------------
+# Inject Streamlit Cloud secrets into environment variables so that
+# config.py (pydantic-settings) can pick them up normally.
+# This is a no-op in local development where a .env file is used instead.
+# ---------------------------------------------------------------------------
+try:
+    _secrets = st.secrets  # raises FileNotFoundError locally if no secrets.toml
+    for _key in ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "LANGCHAIN_API_KEY"):
+        if _key in _secrets and not os.environ.get(_key):
+            os.environ[_key] = _secrets[_key]
+except Exception:
+    pass
+
+# ---------------------------------------------------------------------------
 # Page config (must be first Streamlit call)
 # ---------------------------------------------------------------------------
 st.set_page_config(
@@ -145,7 +158,7 @@ if run_btn and topic_input:
         st.error("TAVILY_API_KEY is not set. Please add it to your .env file.")
         st.stop()
 
-    graph = build_graph()
+    graph = build_graph(db_path=None)  # in-memory; no file system needed on Streamlit Cloud
     thread_id = st.session_state.thread_id
     config = {"configurable": {"thread_id": thread_id}}
 

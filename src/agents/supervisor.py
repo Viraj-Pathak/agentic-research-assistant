@@ -24,12 +24,14 @@ def route(state: ResearchState) -> str:
     if not state.get("synthesized"):
         return "synthesizer"
 
-    # Step 4: if there are knowledge gaps and we haven't exceeded max iterations,
-    # loop back to researcher to fill gaps
+    # Step 4: if there are unsearched knowledge gaps and we haven't exceeded max
+    # iterations, loop back to researcher to fill them.
+    # We check for *unsearched* gaps specifically to avoid an infinite loop when
+    # the researcher has already covered all gaps but the gaps list is non-empty.
     gaps = state.get("gaps", [])
     iteration = state.get("iteration", 0)
-    if gaps and iteration < settings.max_iterations:
-        # Re-add gaps as new research subtopics by returning to researcher
+    unsearched_gaps = [g for g in gaps if g not in searches_completed]
+    if unsearched_gaps and iteration < settings.max_iterations:
         return "researcher"
 
     # Step 5: if synthesis is done but no report has been written, write it
