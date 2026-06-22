@@ -1,6 +1,11 @@
 # Agentic Research Assistant
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B?logo=streamlit)](https://agentic-research-assistant-jxbypfktqrsbe2sw7wjvm9.streamlit.app)
+<div align="center">
+
+[![Live Demo](https://img.shields.io/badge/🔬%20Try%20the%20Live%20Demo-Streamlit%20Cloud-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://agentic-research-assistant-jxbypfktqrsbe2sw7wjvm9.streamlit.app)
+
+</div>
+
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.x-blueviolet?logo=python)
 ![LangChain](https://img.shields.io/badge/LangChain-1.x-1C3C3C?logo=chainlink)
 ![Anthropic](https://img.shields.io/badge/Anthropic-Claude%20Sonnet-orange?logo=anthropic)
@@ -12,8 +17,6 @@
 A **production-quality multi-agent AI system** that autonomously researches any topic end-to-end — no human intervention required. Give it a topic and it plans subtopics, searches the web, synthesizes findings, identifies knowledge gaps, and writes a structured markdown report with citations.
 
 Built with **LangGraph's supervisor pattern** to demonstrate stateful multi-agent orchestration, conditional routing, web search integration, and a live Streamlit UI.
-
-**[▶ Try the live demo](https://agentic-research-assistant-jxbypfktqrsbe2sw7wjvm9.streamlit.app)**
 
 ---
 
