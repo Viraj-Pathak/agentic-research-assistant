@@ -1,76 +1,66 @@
 # Agentic Research Assistant
 
-![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-blueviolet?logo=python)
-![LangChain](https://img.shields.io/badge/LangChain-0.3+-1C3C3C?logo=chainlink)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit%20Cloud-FF4B4B?logo=streamlit)](https://agentic-research-assistant-jxbypfktqrsbe2sw7wjvm9.streamlit.app)
+![LangGraph](https://img.shields.io/badge/LangGraph-1.x-blueviolet?logo=python)
+![LangChain](https://img.shields.io/badge/LangChain-1.x-1C3C3C?logo=chainlink)
 ![Anthropic](https://img.shields.io/badge/Anthropic-Claude%20Sonnet-orange?logo=anthropic)
 ![Tavily](https://img.shields.io/badge/Tavily-Web%20Search-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.41+-FF4B4B?logo=streamlit)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python)
 
-A **production-quality multi-agent AI system** that autonomously researches any topic end-to-end. Given a topic, the system plans subtopics, searches the web, synthesizes findings, identifies knowledge gaps, and produces a structured markdown report — all without human intervention.
+A **production-quality multi-agent AI system** that autonomously researches any topic end-to-end — no human intervention required. Give it a topic and it plans subtopics, searches the web, synthesizes findings, identifies knowledge gaps, and writes a structured markdown report with citations.
 
-Built with **LangGraph's supervisor pattern**, this project demonstrates advanced agentic AI architecture: stateful multi-agent orchestration, conditional routing, SQLite checkpointing for resumability, web search integration, and both a REST API and Streamlit UI.
+Built with **LangGraph's supervisor pattern** to demonstrate stateful multi-agent orchestration, conditional routing, web search integration, and a live Streamlit UI.
+
+**[▶ Try the live demo](https://agentic-research-assistant-jxbypfktqrsbe2sw7wjvm9.streamlit.app)**
 
 ---
 
-## Architecture
+## How It Works
+
+The system runs a loop of five agents, each returning control to the Supervisor after every step:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Research Topic                     │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │   SUPERVISOR    │ ◄─────────────────────┐
-              │  (Router Node)  │                       │
-              └────────┬────────┘                       │
-                       │ conditional edges              │
-         ┌─────────────┼──────────────┬─────────────┐  │
-         ▼             ▼              ▼             ▼  │
-   ┌──────────┐ ┌────────────┐ ┌──────────┐ ┌────────┐ │
-   │ PLANNER  │ │ RESEARCHER │ │SYNTHESIZR│ │ WRITER │ │
-   │          │ │            │ │          │ │        │ │
-   │ Breaks   │ │ Tavily web │ │ Combines │ │ Final  │ │
-   │ topic    │ │ search per │ │ findings │ │ report │ │
-   │ into     │ │ subtopic   │ │ IDs gaps │ │ with   │ │
-   │ subtopics│ │            │ │          │ │cites   │ │
-   └────┬─────┘ └─────┬──────┘ └────┬─────┘ └───┬────┘ │
-        │             │             │            │      │
-        └─────────────┴─────────────┴────────────┘      │
-                       all return to SUPERVISOR ────────┘
+                        ┌─────────────────────┐
+   Research Topic ───►  │     SUPERVISOR      │ ◄──────────────────┐
+                        │  (pure router node) │                    │
+                        └──────────┬──────────┘                    │
+                                   │  conditional edges            │
+              ┌────────────────────┼───────────────┬────────────┐  │
+              ▼                    ▼               ▼            ▼  │
+        ┌──────────┐       ┌────────────┐   ┌──────────┐  ┌────────┤ │
+        │ PLANNER  │       │ RESEARCHER │   │SYNTHESIZER│  │ WRITER │ │
+        │          │       │            │   │           │  │        │ │
+        │ Breaks   │       │ Tavily web │   │ Combines  │  │ Final  │ │
+        │ topic    │       │ search per │   │ findings, │  │ report │ │
+        │ into 3-5 │       │ subtopic + │   │ IDs gaps  │  │ w/     │ │
+        │ subtopics│       │ Claude     │   │           │  │ cites  │ │
+        └────┬─────┘       └─────┬──────┘   └─────┬─────┘  └───┬────┘ │
+             └───────────────────┴─────────────────┴────────────┘      │
+                              all return to SUPERVISOR ─────────────────┘
 ```
-
-### Agent Descriptions
-
-| Agent | Role | Key Behavior |
-|-------|------|--------------|
-| **Supervisor** | Router node | Inspects state, routes via conditional edges — no LLM call needed |
-| **Planner** | Topic decomposer | Uses Claude to break the topic into 3-5 focused, non-overlapping subtopics |
-| **Researcher** | Web searcher | Picks one unsearched subtopic, calls Tavily, extracts key insights via Claude |
-| **Synthesizer** | Gap analyst | Combines all findings, identifies knowledge gaps for follow-up research |
-| **Writer** | Report author | Produces a structured markdown report with inline citations and References section |
 
 ### Routing Logic
 
 ```
-No plan → PLANNER
-Plan exists + unsearched subtopics → RESEARCHER
-All searched + not synthesized → SYNTHESIZER
-Synthesized + gaps exist + iterations < max → RESEARCHER (gap fill)
-Synthesized + no gaps (or max iterations reached) + no report → WRITER
-Report exists → END
+No plan yet                              → PLANNER
+Plan exists + unsearched subtopics       → RESEARCHER
+All subtopics searched + not synthesized → SYNTHESIZER
+Gaps found + iterations < max           → RESEARCHER  (gap-fill loop)
+No gaps remaining / max iterations hit  → WRITER
+Report written                          → END
 ```
 
-### State Schema
+### Agent Roles
 
-The shared `ResearchState` uses LangGraph's reducer annotations for safe concurrent updates:
-
-- `sources` and `findings` use `operator.add` (append semantics across agent updates)
-- `messages` uses LangChain's `add_messages` reducer (deduplication + ordering)
-- All other fields are last-write-wins
+| Agent | What it does |
+|---|---|
+| **Supervisor** | Inspects state and routes — no LLM call, pure conditional logic |
+| **Planner** | Asks Claude to decompose the topic into 3–5 focused subtopics |
+| **Researcher** | Picks the next unsearched subtopic, runs a Tavily search, extracts insights via Claude |
+| **Synthesizer** | Combines all findings, identifies knowledge gaps for follow-up |
+| **Writer** | Produces a structured markdown report with inline `[Source N]` citations |
 
 ---
 
@@ -78,52 +68,50 @@ The shared `ResearchState` uses LangGraph's reducer annotations for safe concurr
 
 ```
 agentic-research-assistant/
-├── .github/workflows/ci.yml      # GitHub Actions: lint + test
 ├── src/
 │   ├── agents/
-│   │   ├── supervisor.py         # Stateless routing function
-│   │   ├── planner.py            # Topic decomposition agent
-│   │   ├── researcher.py         # Web search + insight extraction
-│   │   ├── synthesizer.py        # Findings synthesis + gap analysis
-│   │   └── writer.py             # Markdown report generation
+│   │   ├── supervisor.py      # Stateless routing function
+│   │   ├── planner.py         # Topic decomposition
+│   │   ├── researcher.py      # Web search + insight extraction
+│   │   ├── synthesizer.py     # Findings synthesis + gap analysis
+│   │   └── writer.py          # Markdown report generation
 │   ├── tools/
-│   │   └── search.py             # Tavily web search LangChain tool
+│   │   └── search.py          # Tavily web search LangChain tool
 │   ├── graph/
-│   │   ├── state.py              # ResearchState TypedDict + reducers
-│   │   └── workflow.py           # LangGraph StateGraph construction
+│   │   ├── state.py           # ResearchState TypedDict + reducers
+│   │   └── workflow.py        # LangGraph StateGraph construction
 │   └── api/
-│       └── main.py               # FastAPI REST API
-├── ui/app.py                     # Streamlit demo UI
+│       └── main.py            # FastAPI REST API
+├── ui/
+│   └── app.py                 # Streamlit UI
 ├── tests/
-│   ├── test_state.py             # State reducer and routing unit tests
-│   └── test_workflow.py          # Graph compilation and routing tests
-├── config.py                     # Pydantic Settings configuration
+│   ├── test_state.py          # State reducer + routing unit tests
+│   └── test_workflow.py       # Graph compilation tests
+├── .streamlit/
+│   └── secrets.toml           # Streamlit Cloud secrets template (gitignored)
+├── config.py                  # Pydantic Settings
 ├── requirements.txt
-├── Dockerfile                    # API container
-├── Dockerfile.ui                 # Streamlit UI container
-├── docker-compose.yml            # Orchestrates API + UI
-├── .ruff.toml                    # Ruff linter configuration
-└── .env.example                  # Environment variable template
+├── Dockerfile                 # API container
+├── Dockerfile.ui              # Streamlit UI container
+├── docker-compose.yml
+└── .env.example
 ```
 
 ---
 
-## Quick Start
+## Quick Start (Local)
 
 ### Prerequisites
 
 - Python 3.11+
-- [Anthropic API key](https://console.anthropic.com/)
-- [Tavily API key](https://app.tavily.com/) (free tier available)
-- (Optional) [LangSmith API key](https://smith.langchain.com/) for tracing
+- [Anthropic API key](https://console.anthropic.com/) — for Claude
+- [Tavily API key](https://app.tavily.com/) — free tier (1,000 searches/month)
 
 ### 1. Clone and install
 
 ```bash
 git clone https://github.com/Viraj-Pathak/agentic-research-assistant.git
 cd agentic-research-assistant
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -131,67 +119,73 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env and fill in your API keys
 ```
+
+Edit `.env`:
 
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
 TAVILY_API_KEY=tvly-...
-LANGCHAIN_API_KEY=ls__...      # optional, for LangSmith tracing
-LANGCHAIN_TRACING_V2=false     # set to true to enable tracing
-LANGCHAIN_PROJECT=agentic-research-assistant
+LANGCHAIN_API_KEY=         # optional — LangSmith tracing
+LANGCHAIN_TRACING_V2=false
 ```
 
-### 3. Run the API
-
-```bash
-uvicorn src.api.main:app --reload
-```
-
-API docs available at: http://localhost:8000/docs
-
-### 4. Run the Streamlit UI
+### 3. Run the Streamlit UI
 
 ```bash
 streamlit run ui/app.py
+# → http://localhost:8501
 ```
 
-UI available at: http://localhost:8501
+### 4. Run the REST API (optional)
+
+```bash
+uvicorn src.api.main:app --reload
+# → http://localhost:8000/docs
+```
 
 ---
 
-## API Reference
+## Deploy to Streamlit Cloud
 
-### POST /research
+1. Fork or push this repo to GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io) → **Create app**
+3. Set **Main file path** to `ui/app.py`
+4. Under **Advanced settings → Secrets**, add:
 
-Run the full multi-agent research pipeline on a topic.
+```toml
+ANTHROPIC_API_KEY = "sk-ant-..."
+TAVILY_API_KEY    = "tvly-..."
+```
+
+5. Click **Deploy** — done.
+
+The app uses `MemorySaver` (in-memory checkpointing) when running on Streamlit Cloud, so no file system persistence is needed.
+
+---
+
+## REST API
+
+### POST `/research` — run a full research pipeline
 
 ```bash
 curl -X POST http://localhost:8000/research \
   -H "Content-Type: application/json" \
-  -d '{"topic": "The impact of large language models on scientific research"}'
+  -d '{"topic": "Impact of large language models on scientific research"}'
 ```
 
-**Response:**
 ```json
 {
-  "thread_id": "550e8400-e29b-41d4-a716-446655440000",
-  "topic": "The impact of large language models on scientific research",
+  "thread_id": "550e8400-...",
+  "topic": "Impact of large language models on scientific research",
   "plan": ["LLM applications in drug discovery", "AI-assisted literature review", "..."],
-  "report": "# The Impact of Large Language Models on Scientific Research\n\n...",
-  "sources": [
-    {
-      "title": "GPT-4 in Drug Discovery",
-      "url": "https://example.com/article",
-      "content": "...",
-      "subtopic": "LLM applications in drug discovery"
-    }
-  ],
-  "iterations": 3
+  "report": "# Impact of LLMs on Scientific Research\n\n...",
+  "sources": [{"title": "...", "url": "...", "content": "...", "subtopic": "..."}],
+  "iterations": 4
 }
 ```
 
-### Resume a research session
+### POST `/research` with `thread_id` — resume a session
 
 ```bash
 curl -X POST http://localhost:8000/research \
@@ -199,113 +193,58 @@ curl -X POST http://localhost:8000/research \
   -d '{"topic": "quantum computing", "thread_id": "your-thread-id"}'
 ```
 
-### GET /research/{thread_id}/state
-
-Inspect the current state of a research thread.
+### GET `/research/{thread_id}/state` — inspect progress
 
 ```bash
-curl http://localhost:8000/research/550e8400-e29b-41d4-a716-446655440000/state
-```
-
-**Response:**
-```json
-{
-  "thread_id": "550e8400-e29b-41d4-a716-446655440000",
-  "topic": "quantum computing",
-  "plan": ["quantum hardware", "quantum algorithms", "..."],
-  "searches_completed": ["quantum hardware"],
-  "synthesized": false,
-  "has_report": false,
-  "iteration": 1,
-  "source_count": 5
-}
+curl http://localhost:8000/research/550e8400-.../state
 ```
 
 ---
 
 ## Docker
 
-### Run with Docker Compose (API + UI)
-
 ```bash
-# Copy and fill in your .env file
-cp .env.example .env
-
-# Start both services
+cp .env.example .env   # fill in your keys
 docker-compose up --build
-
-# API: http://localhost:8000
-# UI:  http://localhost:8501
-```
-
-### Run API only
-
-```bash
-docker build -t research-assistant-api .
-docker run -p 8000:8000 --env-file .env research-assistant-api
-```
-
----
-
-## LangSmith Tracing
-
-Enable full agent trace visualization in [LangSmith](https://smith.langchain.com/):
-
-```env
-LANGCHAIN_API_KEY=ls__your_key_here
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_PROJECT=agentic-research-assistant
-```
-
-This captures every LLM call, tool invocation, and state transition in the multi-agent graph, making it easy to debug and optimize agent behavior.
-
----
-
-## Development
-
-### Run tests
-
-```bash
-pytest tests/ -v
-```
-
-### Lint
-
-```bash
-ruff check src/ tests/
-```
-
-### Format
-
-```bash
-ruff format src/ tests/
+# API → http://localhost:8000
+# UI  → http://localhost:8501
 ```
 
 ---
 
 ## Configuration
 
-All settings are managed via `config.py` using `pydantic-settings`:
-
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | `` | Claude API key (required) |
-| `TAVILY_API_KEY` | `` | Tavily search API key (required) |
-| `LANGCHAIN_API_KEY` | `` | LangSmith tracing key (optional) |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | — | Claude API key (required) |
+| `TAVILY_API_KEY` | — | Tavily search key (required) |
+| `LANGCHAIN_API_KEY` | — | LangSmith tracing key (optional) |
 | `LANGCHAIN_TRACING_V2` | `false` | Enable LangSmith tracing |
-| `MODEL_NAME` | `claude-sonnet-4-6` | Anthropic model to use |
+| `MODEL_NAME` | `claude-sonnet-4-6` | Anthropic model |
 | `MAX_ITERATIONS` | `3` | Max research loop iterations |
 | `MAX_SEARCH_RESULTS` | `5` | Tavily results per query |
 
 ---
 
-## Key Design Decisions
+## Development
 
-**Why supervisor pattern over linear chain?** The supervisor gives us dynamic routing based on state — the researcher can be called multiple times (once per subtopic), and the synthesizer can trigger additional research loops to fill gaps, all without hardcoding a fixed pipeline.
+```bash
+pytest tests/ -v          # run tests
+ruff check src/ tests/    # lint
+ruff format src/ tests/   # format
+```
 
-**Why SQLite checkpointing?** LangGraph's `SqliteSaver` persists state after every node execution. This means research sessions survive process restarts, can be resumed by thread ID, and support fault-tolerant long-running research tasks.
+CI runs automatically on push via `.github/workflows/ci.yml`.
 
-**Why separate Dockerfile for UI?** The API and UI have different runtime concerns. Separating them allows independent scaling and lets the Streamlit UI be deployed on services like Streamlit Cloud while the API runs on a dedicated server.
+---
+
+## Design Notes
+
+**Supervisor pattern over linear chain** — routing is state-driven, not hardcoded. The Researcher can be called multiple times (once per subtopic, then again per gap), and the loop exits gracefully once all gaps are covered or `MAX_ITERATIONS` is reached.
+
+**MemorySaver for Streamlit Cloud, SqliteSaver for the API** — the Streamlit UI uses in-memory checkpointing (no file system needed), while the FastAPI backend uses SQLite for persistent, resumable sessions.
+
+**Annotated reducers on shared state** — `sources` and `findings` use `operator.add` (append on each agent update); `messages` uses LangGraph's `add_messages` (deduplication + ordering). All other fields are last-write-wins.
 
 ---
 
